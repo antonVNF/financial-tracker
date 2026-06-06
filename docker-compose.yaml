@@ -1,0 +1,14 @@
+services:
+  postgres:
+      image: postgres:18-bookworm
+      container_name: fin_tracker
+      ports:
+        - "5432:5432"
+      environment:
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: hrygbljhfcs
+        POSTGRES_DB: fin_tracker
+      volumes:
+        - pgdata:/var/lib/postgresql
+volumes:
+  pgdata:
