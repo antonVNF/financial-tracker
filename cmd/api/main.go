@@ -8,6 +8,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
@@ -50,7 +53,34 @@ func main() {
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	http.HandleFunc("/transactions", handlers.CreateTransactionHandler(*repo))
+	http.HandleFunc("POST /transactions", handlers.CreateTransactionHandler(repo))
+	http.HandleFunc("GET /transactions", handlers.GetTransactionsHandler(repo))
+	http.HandleFunc("GET /transactions/{id}", handlers.GetTransactionByIdHandler(repo))
+	http.HandleFunc("PUT /transactions/{id}", handlers.UpdateTransactionHandler(repo))
+	http.HandleFunc("DELETE /transactions/{id}", handlers.DeleteTransactionHandler(repo))
+	http.HandleFunc("GET /balance", handlers.GetBalanceHandler(repo))
+	http.HandleFunc("GET /stats/categories", handlers.GetCategoryStatsHandler(repo))
 
-	http.ListenAndServe(":5959", nil)
+	srv := http.Server{Addr: ":8080", Handler: nil}
+
+	go func() {
+		log.Println("Listening on port 8080")
+
+		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+			log.Fatal(err)
+		}
+
+	}()
+
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, syscall.SIGTERM, syscall.SIGINT)
+	<-ch
+	log.Println("Shutting down gracefully...")
+	ctxShutdown, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelShutdown()
+
+	if err := srv.Shutdown(ctxShutdown); err != nil {
+		log.Fatalf("Shutdown error: %v", err)
+	}
+	log.Println("Server stopped")
 }

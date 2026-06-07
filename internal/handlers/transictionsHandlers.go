@@ -13,7 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func CreateTransactionHandler(repo repository.PostgresRepo) http.HandlerFunc {
+func CreateTransactionHandler(repo *repository.PostgresRepo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 
@@ -121,7 +121,7 @@ func GetTransactionsHandler(repo *repository.PostgresRepo) http.HandlerFunc {
 	}
 }
 
-func GetTransactionById(repo *repository.PostgresRepo) http.HandlerFunc {
+func GetTransactionByIdHandler(repo *repository.PostgresRepo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 
@@ -160,7 +160,7 @@ func GetTransactionById(repo *repository.PostgresRepo) http.HandlerFunc {
 	}
 }
 
-func UpdateTransaction(repo *repository.PostgresRepo) http.HandlerFunc {
+func UpdateTransactionHandler(repo *repository.PostgresRepo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 
@@ -218,7 +218,7 @@ func UpdateTransaction(repo *repository.PostgresRepo) http.HandlerFunc {
 	}
 }
 
-func DeleteTransaction(repo *repository.PostgresRepo) http.HandlerFunc {
+func DeleteTransactionHandler(repo *repository.PostgresRepo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 		if r.Method != http.MethodDelete {
@@ -270,5 +270,52 @@ func GetBalanceHandler(repo *repository.PostgresRepo) http.HandlerFunc {
 		if err := json.NewEncoder(w).Encode(map[string]float64{"balance": balance}); err != nil {
 			log.Printf("failed to encode response: %v", err)
 		}
+	}
+}
+
+func GetCategoryStatsHandler(repo *repository.PostgresRepo) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		defer r.Body.Close()
+
+		startDateStr := r.URL.Query().Get("start_date")
+		endDateStr := r.URL.Query().Get("end_date")
+
+		var startDate, endDate time.Time
+
+		if startDateStr != "" {
+			t, err := time.Parse("2006-01-02", startDateStr)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			startDate = t
+
+		}
+		if endDateStr != "" {
+			t, err := time.Parse("2006-01-02", endDateStr)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			endDate = t
+		}
+
+		stats, err := repo.GetStatsByCategory(r.Context(), startDate, endDate)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(stats); err != nil {
+			log.Printf("failed to encode response: %v", err)
+		}
+
+		return
+
 	}
 }

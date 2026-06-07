@@ -174,3 +174,33 @@ func (r *PostgresRepo) GetBalance(ctx context.Context) (float64, error) {
 
 	return balance, nil
 }
+
+func (r *PostgresRepo) GetStatsByCategory(ctx context.Context, start, end time.Time) ([]models.CategoryStat, error) {
+	sql := `SELECT category, SUM(CASE WHEN type = 'income' THEN amount ELSE -amount END) AS total,
+ 	COUNT(*) AS count
+	FROM transactions
+	WHERE ($1::date = '0001-01-01'::date OR date >= $1::date)
+  	AND ($2::date = '0001-01-01'::date OR date <= $2::date)	
+	GROUP BY category
+	ORDER BY category
+	`
+	rows, err := r.db.Query(ctx, sql, start, end)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := []models.CategoryStat{}
+
+	for rows.Next() {
+		var category string
+		var total float64
+		var count int
+		if err := rows.Scan(&category, &total, &count); err != nil {
+			return nil, err
+		}
+		result = append(result, models.CategoryStat{Category: category, Total: total, Count: count})
+	}
+
+	return result, nil
+}
