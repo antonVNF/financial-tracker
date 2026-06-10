@@ -5,6 +5,7 @@ import (
 	"financial-tracker/internal/models"
 	"fmt"
 	"log"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -23,16 +24,18 @@ type TransactionRepository interface {
 
 	GetBalance(ctx context.Context) (float64, error)
 
-	GetStatsByCategory(ctx context.Context, start, end time.Time) (map[string]float64, error)
+	GetStatsByCategory(ctx context.Context, start, end time.Time) ([]models.CategoryStat, error)
 }
 
 type PostgresRepo struct {
-	db *pgxpool.Pool
+	db     *pgxpool.Pool
+	logger *slog.Logger
 }
 
-func NewPostgresRepo(pool *pgxpool.Pool) *PostgresRepo {
+func NewPostgresRepo(pool *pgxpool.Pool, logger *slog.Logger) *PostgresRepo {
 	return &PostgresRepo{
-		db: pool,
+		db:     pool,
+		logger: logger,
 	}
 }
 

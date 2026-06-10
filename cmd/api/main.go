@@ -6,6 +6,7 @@ import (
 	"financial-tracker/internal/repository"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -20,6 +21,8 @@ func main() {
 	ctx := context.Background()
 
 	envCheck := godotenv.Load(".env")
+
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
 	if err := envCheck; err != nil {
 		log.Fatal(err)
@@ -45,7 +48,9 @@ func main() {
 
 	log.Println("Database connected and pinged successfully")
 
-	var repo = repository.NewPostgresRepo(pool)
+	var repo = repository.NewPostgresRepo(pool, logger)
+
+	handler := handlers.NewTransactionHandler(repo, logger)
 
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -53,13 +58,13 @@ func main() {
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	http.HandleFunc("POST /transactions", handlers.CreateTransactionHandler(repo))
-	http.HandleFunc("GET /transactions", handlers.GetTransactionsHandler(repo))
-	http.HandleFunc("GET /transactions/{id}", handlers.GetTransactionByIdHandler(repo))
-	http.HandleFunc("PUT /transactions/{id}", handlers.UpdateTransactionHandler(repo))
-	http.HandleFunc("DELETE /transactions/{id}", handlers.DeleteTransactionHandler(repo))
-	http.HandleFunc("GET /balance", handlers.GetBalanceHandler(repo))
-	http.HandleFunc("GET /stats/categories", handlers.GetCategoryStatsHandler(repo))
+	http.HandleFunc("POST /transactions", handler.Create())
+	http.HandleFunc("GET /transactions", handler.GetAll())
+	http.HandleFunc("GET /transactions/{id}", handler.GetByID())
+	http.HandleFunc("PUT /transactions/{id}", handler.Update())
+	http.HandleFunc("DELETE /transactions/{id}", handler.Delete())
+	http.HandleFunc("GET /balance", handler.GetBalance())
+	http.HandleFunc("GET /stats/categories", handler.GetCategoryStats())
 
 	srv := http.Server{Addr: ":8080", Handler: nil}
 
